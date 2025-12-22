@@ -3,6 +3,7 @@ FROM python:3.10-slim
 # ---- system deps ----
 RUN apt-get update && apt-get install -y \
     ffmpeg \
+    gcc \
     git \
     && rm -rf /var/lib/apt/lists/*
 
@@ -14,8 +15,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ---- app code ----
-COPY detect_friend.py .
+COPY friend_detector.py .
 
 # ---- runtime ----
-ENTRYPOINT ["python", "detect_friend.py"]
+ENTRYPOINT ["python", "friend_detector.py"]
 
