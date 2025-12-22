@@ -1,0 +1,7 @@
+yt-dlp
+ffmpeg-python
+resemblyzer
+numpy
+scipy
+torch
+
