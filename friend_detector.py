@@ -100,7 +100,7 @@ def main():
 
     if coverage >= FULL_EPISODE_THRESHOLD:
         print("Detected FULL EPISODE HOST")
-        run("ffmpeg -y -i episode.mp4 -c copy friend_full_episode.mp4")
+        run("ffmpeg -y -i episode.mp4 -c copy /data/friend_full_episode.mp4")
         return
 
     print("Detected FIXED SEGMENT")
@@ -111,7 +111,7 @@ def main():
     end = largest[1] + PADDING_SECONDS
 
     print(f"Cutting segment: {start:.1f}s → {end:.1f}s")
-    cut(start, end, "friend_segment.mp4")
+    cut(start, end, "/data/friend_segment.mp4")
 
 if __name__ == "__main__":
     main()
