@@ -5,13 +5,12 @@ from resemblyzer import VoiceEncoder, preprocess_wav
 from scipy.io import wavfile
 import subprocess
 import json
+import re
+import sys
 
 # ---------------- CONFIG ----------------
-YOUTUBE_URL = os.environ.get("YOUTUBE_URL")
-FRIEND_WAV = os.environ.get("FRIEND_WAV", "/data/friend.wav")
-
-if not YOUTUBE_URL:
-    raise ValueError("YOUTUBE_URL environment variable not set")
+YOUTUBE_URL = ""
+FRIEND_WAV = os.environ.get("FRIEND_WAV", "samples/friend.wav")
 
 CHUNK_SECONDS = 10
 SIMILARITY_THRESHOLD = 0.80
@@ -21,24 +20,39 @@ CHAPTER_PERCENT_THRESHOLD = 0.6
 
 encoder = VoiceEncoder()
 
+def safe_filename(name: str) -> str:
+    name = name.strip()
+    name = re.sub(r"[^\w\s\-]", "", name)  # entfernt ?, :, /, etc.
+    name = re.sub(r"\s+", "_", name)
+    return name
+
+
 def run(cmd):
     subprocess.run(cmd, shell=True, check=True)
 
-def get_chapters():
+def get_video_meta_data():
+    print("glob yt", YOUTUBE_URL)
     cmd = f"yt-dlp --dump-json {YOUTUBE_URL}"
     result = subprocess.check_output(cmd, shell=True)
     info = json.loads(result)
+    title = info.get("title", "")
+    upload_date = info.get("upload_date", "")
     chapters = info.get("chapters", [])
     if not chapters:
-        raise ValueError("No chapters found")
-    return [
-        {
-            "title": c["title"],
-            "start": c["start_time"],
-            "end": c["end_time"]
-        }
-        for c in chapters
-    ]
+        return []
+
+    return {
+        "title": title,
+        "upload_date": upload_date,
+        "chapters": [
+            {
+                "title": c["title"],
+                "start": c["start_time"],
+                "end": c["end_time"]
+            }
+            for c in chapters
+        ]
+    }
 
 def download_episode():
     run(f"""
@@ -73,11 +87,25 @@ def cut(start, end, output):
     """)
 
 def main():
+
+    if len(sys.argv) < 2:
+        print("Usage: friend_detector.py <youtube_url>")
+        sys.exit(1)
+
+    global YOUTUBE_URL 
+    YOUTUBE_URL = sys.argv[1]
+
+    meta_data = get_video_meta_data()
+    chapters = meta_data["chapters"]
+
+    if not chapters:
+        print("No Chapters Found. Exiting")
+        return
+
     download_episode()
     extract_audio()
 
     friend_embed = load_friend_embedding()
-    chapters = get_chapters()
 
     friend_chapters = []
 
@@ -96,10 +124,17 @@ def main():
 
     print(f"\nFriend in {detected}/{total} chapters ({ratio:.1%})")
 
+    if detected == 0:
+        return
+
+    title = safe_filename(meta_data['title'])
+
     # --- FULL EPISODE CASE ---
     if ratio >= CHAPTER_PERCENT_THRESHOLD:
         print("Detected PRIMARY HOST → keeping full episode")
-        run("ffmpeg -y -i episode.mp4 -c copy /data/friend_full_episode.mp4")
+        run(f"""
+        ffmpeg -y -i episode.mp4 -c copy /data/{meta_data['upload_date']}-friend_full_episode-{title}.mp4
+        """)
         return
 
     # --- PARTIAL APPEARANCE CASE ---
@@ -110,7 +145,8 @@ def main():
     start = max(0, start)
 
     print(f"Cutting segment: {start:.1f}s → {end:.1f}s")
-    cut(start, end, "/data/friend_segment.mp4")
+    cut(start, end, 
+        f"""/data/{meta_data['upload_date']}-friend_segment-{title}.mp4""")
 
 if __name__ == "__main__":
     main()

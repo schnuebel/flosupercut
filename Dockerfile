@@ -17,6 +17,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ---- app code ----
 COPY friend_detector.py .
 
+COPY samples/ /app/samples/
+
 # ---- runtime ----
 ENTRYPOINT ["python", "friend_detector.py"]
 
